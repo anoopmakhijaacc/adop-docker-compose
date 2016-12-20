@@ -25,6 +25,10 @@ Usage:
 	    -m <MACHINE_NAME> 
 	    -c <AWS_VPC_ID> 
 	    -r <AWS_DEFAULT_REGION> 
+	    [-i <AWS_SUBNET_ID>]
+	    [-e <EIP>]
+	    [-d <AMI_ID>]
+	    [-l <SSH_User>]
 	    [-z <AVAILABILITY_ZONE_LETTER>] 
 	    [-a <AWS_ACCESS_KEY>] 
 	    [-s <AWS_SECRET_ACCESS_KEY>] 
@@ -83,7 +87,7 @@ source_aws() {
   fi
 
   if [ -z ${AWS_INSTANCE_TYPE} ]; then
-    sed -i'' -e "s/###AWS_INSTANCE_TYPE###/t2.large/g" ${AWS_FILE}
+    sed -i'' -e "s/###AWS_INSTANCE_TYPE###/m4.xlarge/g" ${AWS_FILE}
   else
     sed -i'' -e "s/###AWS_INSTANCE_TYPE###/$AWS_INSTANCE_TYPE/g" ${AWS_FILE}
   fi
@@ -96,6 +100,35 @@ source_aws() {
   
   sed -i'' -e "s/###AWS_DEFAULT_REGION###/$AWS_DEFAULT_REGION/g" ${AWS_FILE}
 
+}
+
+# Attach Elastic IP to EC2
+attach_eip() {
+	echo "Attaching EIP to EC2..."
+	#Get existing Public IP
+	public_ip=$(docker-machine inspect ${MACHINE_NAME} | jq -r .Driver.IPAddress)
+	#Get Config.json file path	
+	config_path=$(docker-machine inspect ${MACHINE_NAME} | jq -r .HostOptions.AuthOptions.StorePath)
+	#Get Instance ID of EC2
+	instance_id=$(aws ec2 describe-instances --filters "Name=ip-address,Values=${public_ip}" --region ${AWS_DEFAULT_REGION} --query 'Reservations[0].Instances[0].InstanceId' |  tr -d '"')
+	#Get EIP allocation-id from EIP
+	eip_allocationid=$(aws ec2 describe-addresses --filters "Name=public-ip,Values=${EIP}" --region ${AWS_DEFAULT_REGION} --query 'Addresses[0].AllocationId' |  tr -d '"')
+	#Update config.json file
+	sed -i "s/${public_ip}/${EIP}/g" ${config_path}/config.json
+	#Attach EIP to Ec2
+	aws ec2 associate-address --instance-id ${instance_id} --allocation-id ${eip_allocationid} --allow-reassociation --region ${AWS_DEFAULT_REGION}
+	#Regenerate certs	
+	docker-machine regenerate-certs ${MACHINE_NAME} -f
+}
+
+check_eip() {
+	echo "Checking if EIP is already in use..."
+	instance_id=$(aws ec2 describe-addresses --filters "Name=public-ip,Values=${EIP}" --region ${AWS_DEFAULT_REGION} --query 'Addresses[0].InstanceId')
+	
+	if [ "${instance_id}" != "null" ]; then
+			echo "EIP: ${EIP} is already attached to InstanceId: ${instance_id}"
+			exit 1
+	fi
 }
 
 provision_aws() {
@@ -120,6 +153,12 @@ provision_aws() {
       echo "WARN: AWS_ACCESS_KEY_ID not set (externally or with -a), delegating to Docker Machine"
     fi
 
+    if [ ${AMIID} -a -z ${SSHUSER} ];
+    then
+      echo "WARN: SSHUSER not set. Using default ssh-user to ubuntu"
+	  export SSHUSER="ubuntu"
+    fi
+
     if [ -z ${AWS_SECRET_ACCESS_KEY} ];
     then
       echo "WARN: AWS_SECRET_ACCESS_KEY not set (externally or with -s), delegating to Docker Machine"
@@ -128,6 +167,10 @@ provision_aws() {
     if [ -z ${AWS_DOCKER_MACHINE_SIZE} ]; then
     	export AWS_DOCKER_MACHINE_SIZE="m4.xlarge"
     fi
+	
+	if [ ${EIP} ]; then
+			check_eip
+	fi
 
     # Create a file with AWS parameters
     source_aws
@@ -159,12 +202,28 @@ provision_aws() {
                         --amazonec2-region ${AWS_DEFAULT_REGION}"
         fi
 
+		if [ ${AMIID} ]; then
+			MACHINE_CREATE_CMD="${MACHINE_CREATE_CMD} \
+								--amazonec2-ami ${AMIID} \
+								--amazonec2-ssh-user ${SSHUSER}"
+		fi
+		
+		if [ ${AWS_SUBNET_ID} ]; then
+			MACHINE_CREATE_CMD="${MACHINE_CREATE_CMD} --amazonec2-subnet-id ${AWS_SUBNET_ID}"
+		fi
+		
         MACHINE_CREATE_CMD="${MACHINE_CREATE_CMD} ${MACHINE_NAME}"
+		
+		echo ${MACHINE_CREATE_CMD}
         ${MACHINE_CREATE_CMD}
+		
+		if [ ${EIP} ]; then
+			attach_eip
+		fi
     fi
 }
 
-while getopts "t:m:a:s:c:z:r:u:p:" opt; do
+while getopts "t:m:a:s:c:z:r:u:p:i:e:l:d:" opt; do
   case ${opt} in
     t)
       export MACHINE_TYPE=${OPTARG}
@@ -192,13 +251,25 @@ while getopts "t:m:a:s:c:z:r:u:p:" opt; do
       ;;
     p)
       export INITIAL_ADMIN_PASSWORD_PLAIN=${OPTARG}
-      ;;      
+      ;;
+	i)
+      export AWS_SUBNET_ID=${OPTARG}
+      ;;
+    e)
+      export EIP=${OPTARG}
+      ;;
+	d)
+      export AMIID=${OPTARG}
+      ;;
+	l)
+      export SSHUSER=${OPTARG}
+      ;;
     *)
       echo "Invalid parameter(s) or option(s)."
       usage
       exit 1
       ;;
-  esac
+  esac  
 done
 
 if [ -z ${MACHINE_TYPE} ]; then
@@ -214,8 +285,8 @@ case ${MACHINE_TYPE} in
     "local")
         provision_local
         ;;
-    "aws")
-        provision_aws
+    "aws")        
+		provision_aws
         CLI_COMPOSE_OPTS="-f etc/aws/default.yml"
         ;;
     *)
