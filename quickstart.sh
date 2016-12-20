@@ -204,8 +204,8 @@ provision_aws() {
 
 		if [ ${AMIID} ]; then
 			MACHINE_CREATE_CMD="${MACHINE_CREATE_CMD} \
-								--amazonec2-ami ${AMIID} \
-								--amazonec2-ssh-user ${SSHUSER}"
+						--amazonec2-ami ${AMIID} \
+						--amazonec2-ssh-user ${SSHUSER}"
 		fi
 		
 		if [ ${AWS_SUBNET_ID} ]; then
