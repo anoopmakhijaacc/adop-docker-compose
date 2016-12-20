@@ -167,10 +167,6 @@ provision_aws() {
     if [ -z ${AWS_DOCKER_MACHINE_SIZE} ]; then
     	export AWS_DOCKER_MACHINE_SIZE="m4.xlarge"
     fi
-	
-	if [ ${EIP} ]; then
-			check_eip
-	fi
 
     # Create a file with AWS parameters
     source_aws
@@ -188,6 +184,10 @@ provision_aws() {
     if [ ${rc} -eq 0 ]; then
         echo "Docker machine '$MACHINE_NAME' already exists"
     else
+		if [ ${EIP} ]; then
+			check_eip
+		fi
+		
         MACHINE_CREATE_CMD="docker-machine create \
                     --driver amazonec2 \
                     --amazonec2-vpc-id ${AWS_VPC_ID} \
