@@ -213,8 +213,6 @@ provision_aws() {
 		fi
 		
         MACHINE_CREATE_CMD="${MACHINE_CREATE_CMD} ${MACHINE_NAME}"
-		
-		echo ${MACHINE_CREATE_CMD}
         ${MACHINE_CREATE_CMD}
 		
 		if [ ${EIP} ]; then
