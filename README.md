@@ -42,11 +42,12 @@ NB. the instructions will also work in anywhere supported by [Docker Machine](ht
                                -a <AWS_ACCESS_KEY>(optional) 
                                -s <AWS_SECRET_ACCESS_EY>(optional) 
                                -u <INITIAL_ADMIN_USER>
-							   -i <AWS_SUBNET_ID> (optional) 
-							   -e <EIP> (optional) 
-							   -d <AMI_ID> (optional) 
-   							   -l <SSH_User> (optional) 
                                -p <INITIAL_ADMIN_PASSWORD>(optional) ...
+                               -i <AWS_SUBNET_ID> (optional) 
+                               -e <EIP> (optional) 
+                               -d <AMI_ID> (optional) 
+                               -l <SSH_User> (optional) 
+                               
         ```
         - You will need to supply:
             - the type of machine to create (aws, in this example)
