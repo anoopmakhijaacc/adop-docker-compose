@@ -58,10 +58,15 @@ NB. the instructions will also work in anywhere supported by [Docker Machine](ht
                 - the AWS region id in this format: eu-west-1
             - a username and password (optional) to act as credentials for the initial admin user (you will be prompted to re-enter your password if it is considered weak)
                 - The initial admin username cannot be set to 'admin' to avoid duplicate entries in LDAP.
+			- If VPC has multiple subnets then we can specify the subnet that we want to use for the ADOP instance by passing the aws_subnet_id using "-i" option
+			- Elastic IP (optional) can be associated with ADOP instance by using option "-e"
+			- The default AMI ID used while creating ADOP instance can be found at https://docs.docker.com/machine/drivers/aws/#/default-amis. If we want to use a different AMI (optional) then we can do that by using option "-d"
+				- Recommended AMI are Ubuntu Server 16+ 
+			- The default SSH user to login to ADOP instance is ubuntu. If are using a different AMI which has login user other than ubuntu then we can specify the ssh user name using the option "-l" 
             - AWS parameters i.e. a subnet ID, the name of a keypair and an EC2 instance type (these parameters are useful if you would like to extend the platform with additional AWS EC2 services)
     - For example (if you don't have ~/.aws set up):
 
-        ```./quickstart.sh -t aws -m adop1 -a AAA -s BBB -c vpc-123abc -r eu-west-1 -u user.name -p userPassword```
+        ```./quickstart.sh -t aws -m adop1 -a AAA -s BBB -c vpc-123abc -r eu-west-1 -u user.name -p userPassword -i subnet-a3ad9 -e 52.18.16.12 -d ami-6f587 -l ec2-user```
         - N.B. If you see an error saying that docker-machine cannot find an associated subnet in a zone, go back to the VPC Dashboard on AWS and check the availablity zone for the subnet you've created. Then rerun the startup script and use the -z option to specify the zone for your subnet, e.g. for a zone of eu-west-1c the above command becomes:
 
             ```./quickstart.sh -t aws -m adop1 -a AAA -s BBB -c vpc-123abc -r eu-west-1 -u user.name -p userPassword -z c```
